@@ -200,21 +200,29 @@
             font-weight: 600;
             min-width: 26px;
         }
-        .time-input {
-            width: 100%;
-            padding: 8px 8px;
+        .time-sel {
+            padding: 8px 4px;
             border: 1.5px solid var(--gray-200);
             border-radius: 8px;
             font-size: 16px;
             font-weight: 600;
             color: var(--gray-800);
             background: var(--gray-50);
+            text-align: center;
+            min-width: 52px;
             -webkit-appearance: none;
+            appearance: none;
         }
-        .time-input:focus {
+        .time-sel:focus {
             outline: none;
             border-color: var(--primary);
             background: white;
+        }
+        .time-sel.empty { color: var(--gray-400); }
+        .time-colon {
+            font-size: 16px;
+            font-weight: 700;
+            color: var(--gray-600);
         }
         .time-sep {
             font-size: 16px;
@@ -397,6 +405,30 @@
 
         /* ==================== Utilities ==================== */
 
+        function timeSelHTML(key, type, timeStr) {
+            const parts = timeStr ? timeStr.split(':').map(Number) : [null, null];
+            const curH = parts[0], curM = parts[1];
+
+            let hOpts = '<option value="">--</option>';
+            for (let i = 0; i <= 23; i++) {
+                const sel = curH === i ? ' selected' : '';
+                hOpts += `<option value="${i}"${sel}>${String(i).padStart(2,'0')}</option>`;
+            }
+
+            let mOpts = '<option value="">--</option>';
+            for (let i = 0; i <= 59; i++) {
+                const sel = curM === i ? ' selected' : '';
+                mOpts += `<option value="${i}"${sel}>${String(i).padStart(2,'0')}</option>`;
+            }
+
+            const hCls = curH === null ? 'time-sel empty' : 'time-sel';
+            const mCls = curM === null ? 'time-sel empty' : 'time-sel';
+
+            return `<select class="${hCls}" data-key="${key}" data-type="${type}" data-part="h" onchange="APP.onSel(this)">${hOpts}</select>` +
+                   `<span class="time-colon">:</span>` +
+                   `<select class="${mCls}" data-key="${key}" data-type="${type}" data-part="m" onchange="APP.onSel(this)">${mOpts}</select>`;
+        }
+
         function fmtDate(d) {
             return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
         }
@@ -567,16 +599,12 @@
                     html += `<div class="time-row">
                         <div class="time-group">
                             <span class="time-lbl">出勤</span>
-                            <input type="time" class="time-input" value="${rec.start||''}" step="60"
-                                   data-key="${key}" data-field="start"
-                                   onchange="APP.onTime(this)">
+                            ${timeSelHTML(key, 'start', rec.start)}
                         </div>
                         <span class="time-sep">〜</span>
                         <div class="time-group">
                             <span class="time-lbl">退勤</span>
-                            <input type="time" class="time-input" value="${rec.end||''}" step="60"
-                                   data-key="${key}" data-field="end"
-                                   onchange="APP.onTime(this)">
+                            ${timeSelHTML(key, 'end', rec.end)}
                         </div>
                     </div>`;
 
@@ -644,28 +672,34 @@
 
         /* ==================== Event Handlers ==================== */
 
-        function onTime(el) {
+        function onSel(el) {
             const key = el.dataset.key;
-            const field = el.dataset.field;
-            let val = el.value;
-            const currentVal = (state.records[key] && state.records[key][field]) || '';
+            const type = el.dataset.type;
+            const group = el.closest('.time-group');
+            const hSel = group.querySelector('[data-part="h"]');
+            const mSel = group.querySelector('[data-part="m"]');
+            const h = hSel.value;
+            const m = mSel.value;
 
-            if (!val) {
-                // Value is empty (reset was tapped or cleared)
-                if (!currentVal) return; // No change, skip re-render
-                if (state.records[key]) {
-                    delete state.records[key][field];
+            // Both empty = clear
+            if (h === '' && m === '') {
+                if (state.records[key] && state.records[key][type]) {
+                    delete state.records[key][type];
                     if (!state.records[key].start && !state.records[key].end) {
                         delete state.records[key];
                     }
+                    save(); render();
                 }
-                save(); render(); return;
+                return;
             }
 
-            if (val === currentVal) return; // No change, skip re-render
+            // Wait until both are selected
+            if (h === '' || m === '') return;
 
+            const timeStr = `${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}`;
             if (!state.records[key]) state.records[key] = {};
-            state.records[key][field] = val;
+            if (state.records[key][type] === timeStr) return;
+            state.records[key][type] = timeStr;
             save();
             render();
         }
@@ -696,7 +730,7 @@
         /* ==================== Public API ==================== */
 
         window.APP = {
-            navPrev, navNext, goToday, setView, onTime, clearData, clearDay
+            navPrev, navNext, goToday, setView, onSel, clearData, clearDay
         };
 
         /* ==================== Init ==================== */

@@ -447,15 +447,18 @@
             if (s === null || e === null || e <= s) return { total: 0, regular: 0, overtime: 0 };
             let workMin = (e - s) - BREAK_HOURS * 60;
             if (workMin < 0) workMin = 0;
-            const total = workMin / 60;
             return {
-                total: total,
-                regular: Math.min(total, REGULAR_HOURS),
-                overtime: Math.max(0, total - REGULAR_HOURS)
+                total: workMin,
+                regular: Math.min(workMin, REGULAR_HOURS * 60),
+                overtime: Math.max(0, workMin - REGULAR_HOURS * 60)
             };
         }
 
-        function fmtH(v) { return v.toFixed(2); }
+        function fmtH(min) {
+            const h = Math.floor(min / 60);
+            const m = min % 60;
+            return `${h}.${String(m).padStart(2, '0')}`;
+        }
 
         /* ==================== Persistence ==================== */
 
